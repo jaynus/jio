@@ -1,11 +1,21 @@
 #include <stdio.h>
 
-#include "jio.hpp"
+#include <string>
+
+#include <jio/transports/named_pipe.hpp>
+
+class NewPlayerMessage {
+public:
+	NewPlayerMessage(int a, const std::string & name) {}
+};
 
 int main(int argc, char **argv) {
-	jio::NamedPipeTransport t;
+	NewPlayerMessage newPlayerMsg(12345, "jaynus");
 	
-	printf("Hi Mom!\n");
+	jio::transports::named_pipe p("asdf");
+	p << newPlayerMsg;
+	p.close();
+	
 	
 	return 0;
 }
