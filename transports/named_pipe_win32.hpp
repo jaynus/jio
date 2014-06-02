@@ -10,6 +10,8 @@
 #include <jio/exception.hpp>
 #include <jio/transports/common.hpp>
 
+#include <thread>
+
 namespace jio {
 	namespace transports {
 
@@ -17,8 +19,9 @@ namespace jio {
 			uint32_t timeout;
 			uint32_t max_buffer_in;
 			uint32_t max_buffer_out;
+			bool use_completion_port;
 		};
-		named_pipe_settings named_pipe_settings_default = { 1000, 4096, 4096 };
+		named_pipe_settings named_pipe_settings_default = { 1000, 4096, 4096, true };
 
 		class named_pipe :
 			public base_pipe {
@@ -35,7 +38,7 @@ namespace jio {
 				_settings = settings;
 
 				// initialize our handles appropriately
-				_handle				= INVALID_HANDLE_VALUE;
+				_hPipe				= INVALID_HANDLE_VALUE;
 				_hCompletionPort	= INVALID_HANDLE_VALUE;
 				_hListenerThread	= INVALID_HANDLE_VALUE;
 
@@ -65,10 +68,10 @@ namespace jio {
 			}
 			void close(void) {
 				
-				DisconnectNamedPipe(_handle);
+				DisconnectNamedPipe(_hPipe);
 
 				CloseHandle(_hCompletionPort);
-				CloseHandle(_handle);
+				CloseHandle(_hPipe);
 			}
 
 			/*!
@@ -136,18 +139,21 @@ namespace jio {
 				::LocalFree(sa.lpSecurityDescriptor);
 
 				// 
-				// Create the completion port
+				// if enabled, create the completion port and utilize threaded listener methodology
 				//
-				if ((_hCompletionPort = ::CreateIoCompletionPort(
-					_hPipe,
-					NULL,
-					0,
-					0)) == INVALID_HANDLE_VALUE) {
-					close();
-					throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+				if (_settings.use_completion_port) {
+					
+					if ((_hCompletionPort = ::CreateIoCompletionPort(
+						_hPipe,
+						NULL,
+						0,
+						0)) == INVALID_HANDLE_VALUE) {
+						close();
+						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+					}
+					
+
 				}
-
-
 
 				// return true, we are done
 				return true;
