@@ -29,7 +29,7 @@ namespace jio {
 		*/
 		class i_transport {
 		public:
-			virtual void 			open(void) = 0;
+			virtual bool 			open(void) = 0;
 			virtual void 			close(void) = 0;
 			
 			virtual void 			flush(void) = 0;

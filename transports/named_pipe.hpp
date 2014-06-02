@@ -29,9 +29,11 @@ namespace jio {
 			 *	The fully qualified path of the pipe.
 			 */
 			const std::string name() const { return _name; }
+			const bool is_server() const { return _server; }
 		protected:
 			std::string _name;
 			uint32_t _permissions;
+			bool _server;
 			
 		};
 	};

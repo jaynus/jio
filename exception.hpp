@@ -1,13 +1,21 @@
 #pragma once
 
 #include <exception>
+#include <iostream>
 #include <jio/xplatform.hpp>
 
 #if !defined(EXCEPT)
-#define EXCEPT(exception_obj, code)						exception_obj(code, __FILE__, __LINE__); 
-#define EXCEPT_TEXT(exception_obj, code, desc)    		exception_obj(code, __FILE__, __LINE__, desc); 
+#define EXCEPT(exception_obj, code)						exception_obj(code, std::string(__FILE__), __LINE__); 
+#define EXCEPT_TEXT(exception_obj, code, desc)    		exception_obj(code, std::string(__FILE__), __LINE__, desc); 
 
-#define THROW_NOT_IMPL()								throw EXCEPT_TEXT(jio::exception, -1, "Not Implemented");
+#define THROW_NOT_IMPL()								throw EXCEPT_TEXT(jio::exception, -1, std::string("Not Implemented"));
+
+#define PRINT_EXCEPTION(e) { \
+	std::cout << "Exception Caught"; \
+	std::cout << "\nCode:" << e.code; \
+	std::cout << "\nSource: " << e.filename.c_str() << ":" << e.linenumber; \
+	std::cout << "\nDesc: " << e.description.c_str() << "\n\n"; \
+}
 
 #endif
 

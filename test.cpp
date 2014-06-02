@@ -10,12 +10,20 @@ public:
 };
 
 int main(int argc, char **argv) {
-	NewPlayerMessage newPlayerMsg(12345, "jaynus");
-	
-	jio::transports::named_pipe p("asdf");
-	//p << newPlayerMsg;
-	p.close();
-	
+	//NewPlayerMessage newPlayerMsg(12345, "jaynus");
+	try {
+		jio::transports::named_pipe p("\\\\.\\pipe\\die", true);
+		//p << newPlayerMsg;
+	} 
+	catch (jio::exception e) { 
+		PRINT_EXCEPTION(e);
+		getchar();
+		exit(-1);
+	}
+
+	printf("Wee\n");
+
+	getchar();
 	
 	return 0;
 }
