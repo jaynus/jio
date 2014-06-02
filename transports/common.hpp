@@ -1,24 +1,28 @@
 #pragma once
 
 #include <jio/xplatform.hpp>
+#include <jio/exception.hpp>
 #include <jio/transports/common.hpp>
 
 namespace jio {
 	namespace transports {
-	
 		/*
 		* Generic data class
 		*/
-		template<typename T> class message {
+		template<typename T> class message_t {
 		public:
-			message(const T _data, const uint32_t _length) { data = _data; length = _length; }
-			message(const message& o ) {  data = o.data; length = o.length; } 
-			void operator = (const message & o) { data = o.data; length = o.length; }
+			message_t(const T _data, const uint32_t _length) { data = _data; length = _length; }
+			message_t(const message_t& o ) {  data = o.data; length = o.length; } 
+			void operator = (const message_t & o) { data = o.data; length = o.length; }
+			
+			//message_t(const message_t<T> & o ) {  data = o.data; length = o.length; } 
+			//void operator = (const message_t<T> & o) { data = o.data; length = o.length; }
+			
 			
 			T data;
 			uint32_t length;
 		};
-		typedef message<unsigned char *> packet_buf;
+		typedef message_t<unsigned char *> message;
 		
 		/*
 		*	Transport Interface
@@ -30,12 +34,11 @@ namespace jio {
 			
 			virtual void 			flush(void) = 0;
 			
-			virtual packet_buf & 	read(void) = 0;
-			virtual uint32_t		write(const packet_buf & data, uint32_t length ) = 0;
+			virtual message & 		read(void) = 0;
+			virtual uint32_t		write(const message & data ) = 0;
 			
 			
 		};
-		
 		
 		/*
 		* 	Base Transport Class
@@ -48,3 +51,6 @@ namespace jio {
 		};
 	};
 };
+
+
+#include <jio/transports/exception.hpp>

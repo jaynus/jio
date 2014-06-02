@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
 	NewPlayerMessage newPlayerMsg(12345, "jaynus");
 	
 	jio::transports::named_pipe p("asdf");
-	p << newPlayerMsg;
+	//p << newPlayerMsg;
 	p.close();
 	
 	
