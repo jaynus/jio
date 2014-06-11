@@ -23,8 +23,7 @@ namespace jio {
 	/*! 
 	* 
 	*/
-	class exception : 
-	public std::exception {
+	class exception {
 	public:
 		exception() : description(""), filename(""), linenumber(-1), code(0) {}
 		exception(const uint32_t errorcode) : description(""), filename(""), linenumber(-1), code(errorcode) {}
@@ -44,13 +43,13 @@ namespace jio {
 		public jio::exception {
 	public:
 		using jio::exception::exception;
-		not_impl() { jio::exception::exception(-1, "Functionality not implemented."); }
+		not_impl() { jio::exception(-1, "Functionality not implemented."); }
 	};
 
 	class invalid_argument :
 		public jio::exception {
 	public:
 		using jio::exception::exception;
-		invalid_argument() { jio::exception::exception(-1, "Functionality not implemented."); }
+		invalid_argument() { jio::exception(-1, "Functionality not implemented."); }
 	};
 };

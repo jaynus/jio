@@ -43,5 +43,5 @@ namespace jio {
 #include "named_pipe_win32.hpp"
 #else 
 // TODO: named pipe for linux goes here
-// #include "named_pipe_linux.hpp"
+#include "named_pipe_linux.hpp"
 #endif

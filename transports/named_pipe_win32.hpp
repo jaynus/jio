@@ -11,17 +11,30 @@
 #include <jio/transports/common.hpp>
 
 #include <thread>
+#include <string>
 
 namespace jio {
 	namespace transports {
 
-		struct named_pipe_settings {
+		typedef struct named_pipe_settings {
 			uint32_t timeout;
 			uint32_t max_buffer_in;
 			uint32_t max_buffer_out;
 			bool use_completion_port;
-		};
-		named_pipe_settings named_pipe_settings_default = { 1000, 4096, 4096, true };
+			named_pipe_settings() {
+				timeout = 1000;
+				max_buffer_in = 4096;
+				max_buffer_out = 4096;
+				use_completion_port = true;
+			}
+			named_pipe_settings(const named_pipe_settings & in) {
+				timeout = in.timeout;
+				max_buffer_in = in.max_buffer_in;
+				max_buffer_out = in.max_buffer_out;
+				use_completion_port = in.use_completion_port;
+			}
+		} named_pipe_settings;
+		
 
 		class named_pipe :
 			public base_pipe {
@@ -32,7 +45,8 @@ namespace jio {
 			* 	@param [in] pipename The fully qualified path of the named pipe to call.
 			*	@param [in] is_server Boolean on whether this is a client or server instance of the class.
 			**/
-			named_pipe(const std::string & pipename, bool is_server = false, named_pipe_settings settings = named_pipe_settings_default) {
+
+			named_pipe(const std::string & pipename, named_pipe_settings settings, bool is_server = false) {
 				_name = pipename;
 				_server = is_server;
 				_settings = settings;
@@ -40,8 +54,6 @@ namespace jio {
 				// initialize our handles appropriately
 				_hPipe				= INVALID_HANDLE_VALUE;
 				_hCompletionPort	= INVALID_HANDLE_VALUE;
-				_hListenerThread	= INVALID_HANDLE_VALUE;
-
 
 				// create the server here and flag us as already opened
 				if (_server) {
@@ -72,6 +84,9 @@ namespace jio {
 
 				CloseHandle(_hCompletionPort);
 				CloseHandle(_hPipe);
+
+				_hCompletionPort = INVALID_HANDLE_VALUE;
+				_hPipe = INVALID_HANDLE_VALUE;
 			}
 
 			/*!
@@ -105,7 +120,7 @@ namespace jio {
 			jio::transports::named_pipe_settings _settings;
 			HANDLE _hPipe;
 			HANDLE _hCompletionPort;
-			HANDLE _hListenerThread;
+			std::thread _listenerThread;
 
 		protected:
 			/*!
@@ -163,18 +178,69 @@ namespace jio {
 			/*!
 			*	This inner-class handles security for the pipes including firewall, registry and security descriptor creation.
 			*	This is intended to work around any possible permissions humbuggery involved in named pipe access in windows.
+			*	from: http://msdn.microsoft.com/en-us/library/aa364726%28v=VS.85%29.aspx
 			*/
 			class security {
 			public:
-				static void set_firewall_current_allow(void) {
+				static bool set_firewall_allow(const std::wstring & name, const std::wstring & imageFileName) {
+					INetFwProfile*		fwProfile;
+					INetFwMgr*			fwMgr;
+					INetFwPolicy*		fwPolicy;
+					HRESULT				hr;
+//					VARIANT_BOOL		fwEnabled;
 
-				}
-				static void set_firewall_current_delete(void) {
+					hr			= S_OK;
+					fwProfile	= NULL;
+					fwPolicy	= NULL;
+					fwMgr		= NULL;
 
+					if ((hr = CoCreateInstance(__uuidof(NetFwMgr), NULL, CLSCTX_INPROC_SERVER, __uuidof(INetFwMgr), (void**)&fwMgr)) 
+						== S_OK) {
+						if ((hr = fwMgr->get_LocalPolicy(&fwPolicy)) 
+							== S_OK) {
+							if ((hr = fwPolicy->get_CurrentProfile(&fwProfile)) 
+								== S_OK) {
+								//
+								// Okay we finally have a damn profile
+								//
+								INetFwAuthorizedApplication*	fwApp = NULL;
+								INetFwAuthorizedApplications*	fwApps = NULL;
+								BSTR							fwBstrProcessImageFileName = NULL;
+								BSTR							fwBstrName = NULL;
+
+								// Now we need to:
+								// 1. Check if we are already enabled. If we are, just continue
+								// 2. If we are NOT enabled, we need to add and enable ourselves
+								if (!firewall_is_app_enabled(imageFileName, fwProfile)) {
+									
+									// App doesnt exist in the policy, we need to add it
+									if (!firewall_is_app_in_profile(imageFileName, fwProfile)) {
+										firewall_app_add(name, imageFileName, fwProfile);
+									// App exists in the policy, we just need to enable it
+									} else {
+										firewall_app_toggle(imageFileName, fwProfile, true);
+									}
+								}
+								// 
+								// Unwind and clean up
+								//
+								fwProfile->Release();
+							}
+							fwPolicy->Release();
+						} 
+						fwMgr->Release();
+					}
+
+					// After unravelling, if we errored, throw our exception
+					if (hr != S_OK) {
+						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+					}
+
+					return true;
 				}
 
 				static PSECURITY_DESCRIPTOR get_untrusted_sa(void) {
-					SECURITY_ATTRIBUTES sa;
+	//				SECURITY_ATTRIBUTES sa;
 					PSECURITY_DESCRIPTOR pSD;
 					
 					pSD = NULL;
@@ -183,6 +249,151 @@ namespace jio {
 					}
 
 					return pSD;
+				}
+
+			protected:
+				static bool firewall_app_add(const std::wstring & name, const std::wstring & imageFileName, INetFwProfile* fwProfile) {
+					INetFwAuthorizedApplication*	fwApp = NULL;
+					INetFwAuthorizedApplications*	fwApps = NULL;
+					BSTR							fwBstrProcessImageFileName = NULL, fwBstrName = NULL;
+					HRESULT							hr = S_OK;
+					bool							result = false;
+
+					// Allocate a BSTR for the process image file name.
+					fwBstrProcessImageFileName = SysAllocString(imageFileName.c_str());
+					if (fwBstrProcessImageFileName == NULL) {
+						hr = E_OUTOFMEMORY;
+						throw EXCEPT_TEXT(jio::exception, E_OUTOFMEMORY, "SysAllocString: Out of Memory");
+					}
+					fwBstrName = SysAllocString(name.c_str());
+					if (fwBstrName == NULL) {
+						hr = E_OUTOFMEMORY;
+						throw EXCEPT_TEXT(jio::exception, E_OUTOFMEMORY, "SysAllocString: Out of Memory");
+					}
+
+					if ((hr = fwProfile->get_AuthorizedApplications(&fwApps))
+						== S_OK) {
+						if ((hr = fwApps->Item(fwBstrProcessImageFileName, &fwApp))
+							== S_OK) {
+
+							result = true;
+							fwApp->Release();
+						}
+						else {
+							// This is our appropriate handle case, it wasnt in the collection
+							if ((hr = CoCreateInstance( __uuidof(NetFwAuthorizedApplication), NULL, CLSCTX_INPROC_SERVER, __uuidof(INetFwAuthorizedApplication), 
+								(void**)&fwApp)) 
+								== S_OK) {
+
+								fwApp->put_Name(fwBstrName);
+								fwApp->put_ProcessImageFileName(fwBstrProcessImageFileName);
+								fwApp->put_Enabled(VARIANT_TRUE);
+								fwApp->put_Scope(NET_FW_SCOPE_ALL);
+
+								if ((hr = fwApps->Add(fwApp)) == S_OK) {
+									result = true;
+								} 
+
+								fwApp->Release();
+							}
+
+						}
+						fwApps->Release();
+					}
+					SysFreeString(fwBstrProcessImageFileName);
+
+					return result;
+				}
+				static bool firewall_is_app_enabled(const std::wstring & imageFileName, INetFwProfile* fwProfile) {
+					INetFwAuthorizedApplication*	fwApp = NULL;
+					INetFwAuthorizedApplications*	fwApps = NULL;
+					BSTR							fwBstrProcessImageFileName = NULL;
+					HRESULT							hr = S_OK;
+					bool							result = false;
+					VARIANT_BOOL					fwEnabled = VARIANT_FALSE;
+
+					// Allocate a BSTR for the process image file name.
+					fwBstrProcessImageFileName = SysAllocString(imageFileName.c_str());
+					if (fwBstrProcessImageFileName == NULL) {
+						hr = E_OUTOFMEMORY;
+						throw EXCEPT_TEXT(jio::exception, E_OUTOFMEMORY, "SysAllocString: Out of Memory");
+					}
+
+					if ((hr = fwProfile->get_AuthorizedApplications(&fwApps))
+						== S_OK) {
+						if ((hr = fwApps->Item(fwBstrProcessImageFileName, &fwApp))
+							== S_OK) {
+							if ((hr = fwApp->get_Enabled(&fwEnabled))
+								== S_OK) {
+								if (fwEnabled != VARIANT_FALSE) {
+									result = true;
+								}
+							}
+							fwApp->Release();
+						}
+						fwApps->Release();
+					}
+					SysFreeString(fwBstrProcessImageFileName);
+
+					return result;
+				}
+
+				static bool firewall_is_app_in_profile(const std::wstring & imageFileName, INetFwProfile* fwProfile) {
+					INetFwAuthorizedApplication*	fwApp = NULL;
+					INetFwAuthorizedApplications*	fwApps = NULL;
+					BSTR							fwBstrProcessImageFileName = NULL;
+					HRESULT							hr = S_OK;
+					bool							result = false;
+
+					// Allocate a BSTR for the process image file name.
+					fwBstrProcessImageFileName = SysAllocString(imageFileName.c_str());
+					if (fwBstrProcessImageFileName == NULL) {
+						hr = E_OUTOFMEMORY;
+						throw EXCEPT_TEXT(jio::exception, E_OUTOFMEMORY, "SysAllocString: Out of Memory");
+					}
+
+					if ((hr = fwProfile->get_AuthorizedApplications(&fwApps))
+						== S_OK) {
+						if ((hr = fwApps->Item(fwBstrProcessImageFileName, &fwApp))
+							== S_OK) {
+							result = true;
+							fwApp->Release();
+						}
+						fwApps->Release();
+					}
+					SysFreeString(fwBstrProcessImageFileName);
+
+					return result;
+				}
+
+				static bool firewall_app_toggle(const std::wstring & imageFileName, INetFwProfile* fwProfile, bool enabled) {
+					INetFwAuthorizedApplication*	fwApp = NULL;
+					INetFwAuthorizedApplications*	fwApps = NULL;
+					BSTR							fwBstrProcessImageFileName = NULL;
+					HRESULT							hr = S_OK;
+					bool							result = false;
+
+					// Allocate a BSTR for the process image file name.
+					fwBstrProcessImageFileName = SysAllocString(imageFileName.c_str());
+					if (fwBstrProcessImageFileName == NULL) {
+						hr = E_OUTOFMEMORY;
+						throw EXCEPT_TEXT(jio::exception, E_OUTOFMEMORY, "SysAllocString: Out of Memory");
+					}
+
+					if ((hr = fwProfile->get_AuthorizedApplications(&fwApps))
+						== S_OK) {
+						if ((hr = fwApps->Item(fwBstrProcessImageFileName, &fwApp))
+							== S_OK) {
+
+							(enabled) ? fwApp->put_Enabled(VARIANT_TRUE) : fwApp->put_Enabled(VARIANT_FALSE);
+
+							fwApp->Release();
+						}
+						fwApps->Release();
+					}
+					SysFreeString(fwBstrProcessImageFileName);
+
+					return result;
 				}
 			};
 		};
