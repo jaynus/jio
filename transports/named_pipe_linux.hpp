@@ -29,8 +29,8 @@ namespace jio {
 
 			void 			flush(void) { THROW_NOT_IMPL(); }
 
-			message & 		read(void) { THROW_NOT_IMPL(); }
-			uint32_t		write(const message & data) { THROW_NOT_IMPL(); }
+			message_p 		read(void) { THROW_NOT_IMPL(); }
+			uint32_t		write(const message_p data) { THROW_NOT_IMPL(); }
 		};
 	};
 };

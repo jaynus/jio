@@ -92,13 +92,13 @@ namespace jio {
 			/*!
 			*	Reads the next full message off the named pipe buffer
 			*/
-			message & read(void) {
+			message_p  read(void) {
 				THROW_NOT_IMPL();
 			}
 			/*!
 			*	Writes the next message to the named pipe buffer.
 			*/
-			uint32_t write(const message & data) {
+			uint32_t write(const message_p data) {
 				THROW_NOT_IMPL();
 			}
 

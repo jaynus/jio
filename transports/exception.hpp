@@ -14,7 +14,7 @@ namespace jio {
 			using jio::exception::exception; // inherit constructors
 
 		protected:
-			jio::transports::i_transport & _transport;
+			jio::transports::i_transport * _transport;
 		};
 	};
 };
