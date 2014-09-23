@@ -31,9 +31,9 @@ namespace jio {
 				close();
 			}
 
-			bool 			open(void) {
+			bool open(void) {
 				if ((socket_fd = ::socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-					EXCEPT_TEXT(jio::exception, errno, "socket() failed");
+					throw EXCEPT_TEXT(jio::exception, errno, "socket() failed");
 				}
 				
 				memset(&listen_addr, 0x00, sizeof(listen_addr));
@@ -43,48 +43,49 @@ namespace jio {
 
 				if (::bind(socket_fd, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) == -1) {
 					xplatform::socket::close(socket_fd);
-					EXCEPT_TEXT(jio::exception, -1, "bind() failed");
+					throw EXCEPT_TEXT(jio::exception, -1, "bind() failed");
 				}
 
 				return true;
 			}
-			void 			close(void) {
+			void close(void) {
 				if (status) {
 					xplatform::socket::close(socket_fd);
 				}
 			}
-			void 			flush(void) {
+			void flush(void) {
 				THROW_NOT_IMPL();
 			}
 
-			message_p  		read(void) {
+			message_p read(void) {
 				uint32_t res;
 				unsigned char *data;
-				
+
 				// TODO: what do we do on no message case? For now we'll just block...
-				while ((res = recv(socket_fd, NULL, 32, MSG_PEEK)) == 0) {}
-				if (res < 1) {
-					return std::shared_ptr<message>(nullptr);
+				res = recv(socket_fd, NULL, 0, MSG_PEEK);
+				if (res == 0xFFFFFFFF) {
+					printf("ERR: %d\n", WSAGetLastError());
+					throw EXCEPT_TEXT(jio::exception, WSAGetLastError(), "recv() error");
 				}
-				
+
 				return std::shared_ptr<message>(nullptr);
 			}
 
-			uint32_t		write(const message_p data) {
+			uint32_t write(const message_p data) {
 				uint32_t res, sCount;
 
 				if (dest_address == INADDR_NONE) {
-					EXCEPT_TEXT(jio::exception, -1, "No destinations for this transport.");
+					throw EXCEPT_TEXT(jio::exception, -1, "No destinations for this transport.");
 				}
 				if (!status || socket_fd == -1) {
-					EXCEPT_TEXT(jio::exception, -1, "Transport not active.");
+					throw EXCEPT_TEXT(jio::exception, -1, "Transport not active.");
 				}
 				// loop sending the data until we send all of it
 				for (sCount = 0; sCount < data->length;) {
 					res = ::send(socket_fd, (const char *)(data->data + sCount), (data->length - sCount), 0);
 					
 					if (res == -1) {
-						EXCEPT_TEXT(jio::exception, -1, "send() failed");
+						throw EXCEPT_TEXT(jio::exception, -1, "send() failed");
 					}
 					sCount += res;
 				}

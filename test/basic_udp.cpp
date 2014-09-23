@@ -5,8 +5,23 @@
 
 void basic_udp(void) {
 	try {
-		jio::transports::basic_udp(12345);
+		printf("* Beginning UDP listener...\n");
+		auto server = jio::transports::basic_udp(12345);
+		printf("* Press enter to stop listening\n");
+		while (true) {
+			try {
+				jio::transports::message_p msg = server.read();
+				if (msg.get() != nullptr) {
+					printf("%d:%s", msg->length, msg->data);
+					break;
+				}
+			} catch (jio::exception e) {
+				PRINT_EXCEPTION(e);
+			}
+			sleep(1);
+		}
 
+		printf("UDP listening ended\n");
 	}
 	catch (jio::exception e) {
 		PRINT_EXCEPTION(e);

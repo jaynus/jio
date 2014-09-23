@@ -8,8 +8,10 @@ INIT_WINSOCK2();
 
 int main(int argc, char **argv) {
 
-	BEGIN_TEST(named_pipe);
-	BEGIN_TEST(basic_udp);
+	BEGIN_TEST(dispatcher);
+
+	//BEGIN_TEST(named_pipe);
+	//BEGIN_TEST(basic_udp);
 
 	getchar();
 	

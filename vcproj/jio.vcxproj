@@ -13,6 +13,11 @@
   <ItemGroup>
     <ClInclude Include="..\exception.hpp" />
     <ClInclude Include="..\jio.hpp" />
+    <ClInclude Include="..\messaging\dispatcher.hpp" />
+    <ClInclude Include="..\messaging\message.hpp" />
+    <ClInclude Include="..\messaging\protobuf.hpp" />
+    <ClInclude Include="..\messaging\serializer.hpp" />
+    <ClInclude Include="..\thread_pool.hpp" />
     <ClInclude Include="..\transports\basic_udp.hpp" />
     <ClInclude Include="..\transports\common.hpp" />
     <ClInclude Include="..\transports\exception.hpp" />

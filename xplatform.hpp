@@ -7,6 +7,8 @@
 
 #define _WINDOWS
 
+#define sleep Sleep
+
 #else
 
 #if !defined(_LINUX)
@@ -60,7 +62,7 @@ namespace jio {
 				return errorCode;
 
 			if ((errorCode = ::getaddrinfo(host.c_str(), 0, &hints, &result)) != 0) {
-				EXCEPT_TEXT(jio::exception, errorCode, "getaddrinfo() Failed")
+				throw EXCEPT_TEXT(jio::exception, errorCode, "getaddrinfo() Failed")
 			}
 			else {
 
@@ -78,7 +80,7 @@ namespace jio {
 			}
 
 			if (errorCode == INADDR_ANY)
-				EXCEPT_TEXT(jio::exception, errorCode, "Failed to lookup address")
+				throw EXCEPT_TEXT(jio::exception, errorCode, "Failed to lookup address")
 
 				return errorCode;
 		}
@@ -132,7 +134,7 @@ namespace jio {
 					int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
 					if (iResult != 0) {
-						EXCEPT_TEXT(jio::exception, iResult, "WSAStartup() Failed")
+						throw EXCEPT_TEXT(jio::exception, iResult, "WSAStartup() Failed")
 					}
 				}
 
