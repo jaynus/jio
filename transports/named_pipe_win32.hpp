@@ -110,8 +110,6 @@ namespace jio {
 						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
 					}
 				}
-
-
 			}
 			void close(void) {
 				

@@ -25,9 +25,8 @@ namespace jio {
 			message_t(const message_t & o) { data = o.data; length = o.length; src = o.src; }
 			void operator = (const message_t & o) { data = o.data; length = o.length; src = o.src; }
 			~message_t() {
-				// This should ONLY be access via a shared pointer
-				// so once the refcount hits 0, it'll auto-clean itself
-				delete data;
+				if(data)
+					delete data;
 			}
 			//message_t(const message_t<T> & o ) {  data = o.data; length = o.length; } 
 			//void operator = (const message_t<T> & o) { data = o.data; length = o.length; }

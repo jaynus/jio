@@ -15,7 +15,7 @@ namespace jio {
 		class dispatch;
 		typedef std::shared_ptr<dispatch> dispatch_p;
 
-		typedef std::function<dispatch *(dispatcher *, dispatch_p)> dispatch_func_t;
+		typedef std::function<dispatch *(dispatcher *, dispatch *)> dispatch_func_t;
 
 		class dispatch_settings {
 		public:
@@ -38,9 +38,9 @@ namespace jio {
 
 		class dispatch {
 		public:
-			dispatch(uint32_t call_id, std::shared_ptr<char> _data, dispatch_settings _settings = dispatch_settings())
+			dispatch(uint32_t call_id, char * _data, dispatch_settings _settings = dispatch_settings())
 				: id(call_id), settings(_settings) {}
-			~dispatch() {}
+			~dispatch() { }
 
 			dispatch(const dispatch & in)
 				: id(in.id), settings(in.settings) {}
@@ -50,7 +50,7 @@ namespace jio {
 
 			size_t id;
 			dispatch_settings settings;
-			std::shared_ptr<char> data;
+			char * data;
 		};
 
 		class dispatcher {
@@ -65,13 +65,27 @@ namespace jio {
 				return true;
 			}
 
-			dispatch call(dispatch_p disp) {
+			dispatch * call(dispatch * disp) {
 				
 				if (!_id_to_dispatch[disp->id])
 					THROW_NOT_IMPL();
 
-				_id_to_dispatch[disp->id](this, disp);
+				dispatch * ret = _id_to_dispatch[disp->id](this, disp);
+				delete disp;
+			}
+			dispatch * call(size_t id, dispatch * disp) {
+				if (!_id_to_dispatch[id])
+					THROW_NOT_IMPL();
+				disp->id = id;
+				dispatch * ret = _id_to_dispatch[id](this, disp);
+				delete disp;
+			}
+			dispatch * call(std::string & name, dispatch * disp) {
+				if (!_name_to_dispatch[name])
+					THROW_NOT_IMPL();
 
+				dispatch * ret = _name_to_dispatch[name](this, disp);
+				delete disp;
 			}
 
 			bool isolated() const { return _isolated; }
