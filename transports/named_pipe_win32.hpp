@@ -21,17 +21,20 @@ namespace jio {
 			uint32_t max_buffer_in;
 			uint32_t max_buffer_out;
 			bool use_completion_port;
+			std::wstring application_name;
 			named_pipe_settings() {
 				timeout = 1000;
 				max_buffer_in = 4096;
 				max_buffer_out = 4096;
 				use_completion_port = true;
+				application_name = L"";
 			}
 			named_pipe_settings(const named_pipe_settings & in) {
 				timeout = in.timeout;
 				max_buffer_in = in.max_buffer_in;
 				max_buffer_out = in.max_buffer_out;
 				use_completion_port = in.use_completion_port;
+				application_name = in.application_name;
 			}
 		} named_pipe_settings;
 		
@@ -58,7 +61,13 @@ namespace jio {
 				// create the server here and flag us as already opened
 				if (_server) {
 					_server_create();
+				} else {
+					open();
 				}
+
+				// finally, allocate a generic read and write buffer
+				_inputBuffer = new unsigned char[_settings.max_buffer_in];
+				_outputBuffer = new unsigned char[_settings.max_buffer_in];
 			}
 
 			/*!
@@ -66,6 +75,8 @@ namespace jio {
 			*/
 			~named_pipe() {
 				close();
+				delete _inputBuffer;
+				delete _outputBuffer;
 			}
 
 			bool open(void) { 
@@ -74,16 +85,44 @@ namespace jio {
 				if (_server) {
 					return true;
 				}
+				// Client functionality
 
+				// Connect to the pipe
+				_hPipe = CreateFileA(
+					_name.c_str(),			// pipe name 
+					GENERIC_READ |			// read and write access 
+					GENERIC_WRITE,
+					0,						// no sharing 
+					NULL,					// default security attributes
+					OPEN_EXISTING,			// opens existing pipe 
+					FILE_ATTRIBUTE_NORMAL,	// default attributes 
+					NULL);					// no template file 
 				
+				if (_hPipe == INVALID_HANDLE_VALUE) {
+					if (GetLastError() == ERROR_PIPE_BUSY) {
+						// TODO: Eventually handle reconnects here
+						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+					}
+					else {
+						// real error
+						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+					}
+				}
+
 
 			}
 			void close(void) {
 				
-				DisconnectNamedPipe(_hPipe);
-
-				CloseHandle(_hCompletionPort);
-				CloseHandle(_hPipe);
+				if (_hPipe != INVALID_HANDLE_VALUE) {
+					if (is_server()) {
+						DisconnectNamedPipe(_hPipe);
+						if (_settings.use_completion_port) {
+							CloseHandle(_hCompletionPort);
+						}
+					}
+				
+					CloseHandle(_hPipe);
+				}
 
 				_hCompletionPort = INVALID_HANDLE_VALUE;
 				_hPipe = INVALID_HANDLE_VALUE;
@@ -93,20 +132,44 @@ namespace jio {
 			*	Reads the next full message off the named pipe buffer
 			*/
 			message_p  read(void) {
-				THROW_NOT_IMPL();
+				// Read a message off the buffer
+				BOOL fSuccess = FALSE;
+				DWORD cbRead = -1;
+				message *returnMessage;
+
+				fSuccess = ReadFile(_hPipe, _inputBuffer, _settings.max_buffer_in, &cbRead, NULL);
+				if (!fSuccess) {
+					return nullptr;
+				}
+
+				return std::shared_ptr<message_t <unsigned char *>>(new message(_inputBuffer, cbRead));
 			}
 			/*!
 			*	Writes the next message to the named pipe buffer.
 			*/
 			uint32_t write(const message_p data) {
-				THROW_NOT_IMPL();
+				BOOL fSuccess = FALSE;
+				DWORD cbWritten = 0;
+
+				// write the full packet
+				while (cbWritten < data->length) {
+					fSuccess = WriteFile(
+						_hPipe,                  // pipe handle 
+						data->data,             // message 
+						data->length,              // message length 
+						&cbWritten,             // bytes written 
+						NULL);                  // not overlapped 
+					if (!fSuccess) {
+						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+					}
+				}
 			}
 
 			/*!
 			*	Flush the pipe where applicable.
 			*/
 			void flush(void) {
-				THROW_NOT_IMPL();
+				FlushFileBuffers(_hPipe);
 			}
 		
 			/*!
@@ -121,6 +184,8 @@ namespace jio {
 			HANDLE _hPipe;
 			HANDLE _hCompletionPort;
 			std::thread _listenerThread;
+			unsigned char *_inputBuffer;
+			unsigned char *_outputBuffer;
 
 		protected:
 			/*!
@@ -166,11 +231,8 @@ namespace jio {
 						close();
 						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
 					}
-					
-
 				}
-
-				// return true, we are done
+			
 				return true;
 			}
 
@@ -182,6 +244,16 @@ namespace jio {
 			*/
 			class security {
 			public:
+				// wrapper to provide module name
+				static bool set_firewall_allow(const std::wstring &name) {
+					// We need to pull our image name for the helper function to get it
+					WCHAR filePathName[MAX_PATH];
+					GetModuleFileName(NULL, filePathName, MAX_PATH);
+					std::wstring modulename(filePathName);
+
+					return security::set_firewall_allow(L"ACRE 2 Plugin", modulename);
+				}
+
 				static bool set_firewall_allow(const std::wstring & name, const std::wstring & imageFileName) {
 					INetFwProfile*		fwProfile;
 					INetFwMgr*			fwMgr;
