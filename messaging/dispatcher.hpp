@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <future>
+#include <thread>
 
 namespace jio {
 	namespace messaging {
@@ -66,30 +67,47 @@ namespace jio {
 			}
 
 			dispatch * call(dispatch * disp) {
-				
 				if (!_id_to_dispatch[disp->id])
 					THROW_NOT_IMPL();
 
-				dispatch * ret = _id_to_dispatch[disp->id](this, disp);
-				delete disp;
+				return _call(_id_to_dispatch[disp->id], disp);
 			}
 			dispatch * call(size_t id, dispatch * disp) {
 				if (!_id_to_dispatch[id])
 					THROW_NOT_IMPL();
 				disp->id = id;
-				dispatch * ret = _id_to_dispatch[id](this, disp);
-				delete disp;
+
+				return _call(_id_to_dispatch[disp->id], disp);
+				
 			}
 			dispatch * call(std::string & name, dispatch * disp) {
 				if (!_name_to_dispatch[name])
 					THROW_NOT_IMPL();
 
-				dispatch * ret = _name_to_dispatch[name](this, disp);
-				delete disp;
+				return _call(_name_to_dispatch[name], disp);
 			}
-
+			
 			bool isolated() const { return _isolated; }
 		protected:
+			dispatch *_call(dispatch_func_t func, dispatch *disp) {
+				dispatch * ret = nullptr;
+				if (!disp->settings.async && !disp->settings.isolate) {
+					ret = func(this, disp);
+				} else {
+					if (disp->settings.isolate) {
+						if (disp->settings.async) {
+							std::thread t(func(this, disp));
+						} else {
+							std::thread t(func(this, disp));
+							t.join();
+						}
+					}
+				}
+				if (disp->settings.callback != nullptr && !disp->settings.async && !disp->settings.isolate) {
+					disp->settings.callback(this, ret);
+				}
+			}
+			
 			bool _isolated;
 
 			jio::thread_pool & _pool;

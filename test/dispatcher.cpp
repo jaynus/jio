@@ -6,6 +6,7 @@
 
 jio::messaging::dispatch * callback(jio::messaging::dispatcher *d, const jio::messaging::dispatch * in) {
 	printf("\t! Hello World Callback!\n");
+	delete in;
 	return nullptr;
 }
 void dispatcher(void) {
