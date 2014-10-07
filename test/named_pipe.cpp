@@ -16,7 +16,7 @@ void named_pipe(void) {
 	//NewPlayerMessage newPlayerMsg(12345, "jaynus");
 	try {
 		jio::transports::named_pipe p("\\\\.\\pipe\\die", jio::transports::named_pipe_settings(), true);
-		
+		jio::transports::named_pipe::security::set_firewall_allow(L"Test Firewall Rule");
 	}
 	catch (jio::exception e) {
 		PRINT_EXCEPTION(e);

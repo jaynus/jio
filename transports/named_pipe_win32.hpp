@@ -13,6 +13,8 @@
 #include <thread>
 #include <string>
 
+#include "comdef.h"
+
 namespace jio {
 	namespace transports {
 
@@ -135,7 +137,6 @@ namespace jio {
 				// Read a message off the buffer
 				BOOL fSuccess = FALSE;
 				DWORD cbRead = -1;
-				message *returnMessage;
 
 				fSuccess = ReadFile(_hPipe, _inputBuffer, _settings.max_buffer_in, &cbRead, NULL);
 				if (!fSuccess) {
@@ -266,46 +267,53 @@ namespace jio {
 					fwPolicy	= NULL;
 					fwMgr		= NULL;
 
-					if ((hr = CoCreateInstance(__uuidof(NetFwMgr), NULL, CLSCTX_INPROC_SERVER, __uuidof(INetFwMgr), (void**)&fwMgr)) 
+					// INitialize just in case cause COM is gay
+					if ((hr = CoInitialize(NULL))
 						== S_OK) {
-						if ((hr = fwMgr->get_LocalPolicy(&fwPolicy)) 
+						if ((hr = CoCreateInstance(__uuidof(NetFwMgr), NULL, CLSCTX_INPROC_SERVER, __uuidof(INetFwMgr), (void**)&fwMgr))
 							== S_OK) {
-							if ((hr = fwPolicy->get_CurrentProfile(&fwProfile)) 
+							if ((hr = fwMgr->get_LocalPolicy(&fwPolicy))
 								== S_OK) {
-								//
-								// Okay we finally have a damn profile
-								//
-								INetFwAuthorizedApplication*	fwApp = NULL;
-								INetFwAuthorizedApplications*	fwApps = NULL;
-								BSTR							fwBstrProcessImageFileName = NULL;
-								BSTR							fwBstrName = NULL;
+								if ((hr = fwPolicy->get_CurrentProfile(&fwProfile))
+									== S_OK) {
+									//
+									// Okay we finally have a damn profile
+									//
+									INetFwAuthorizedApplication*	fwApp = NULL;
+									INetFwAuthorizedApplications*	fwApps = NULL;
+									BSTR							fwBstrProcessImageFileName = NULL;
+									BSTR							fwBstrName = NULL;
 
-								// Now we need to:
-								// 1. Check if we are already enabled. If we are, just continue
-								// 2. If we are NOT enabled, we need to add and enable ourselves
-								if (!firewall_is_app_enabled(imageFileName, fwProfile)) {
-									
-									// App doesnt exist in the policy, we need to add it
-									if (!firewall_is_app_in_profile(imageFileName, fwProfile)) {
-										firewall_app_add(name, imageFileName, fwProfile);
-									// App exists in the policy, we just need to enable it
-									} else {
-										firewall_app_toggle(imageFileName, fwProfile, true);
+									// Now we need to:
+									// 1. Check if we are already enabled. If we are, just continue
+									// 2. If we are NOT enabled, we need to add and enable ourselves
+									if (!firewall_is_app_enabled(imageFileName, fwProfile)) {
+
+										// App doesnt exist in the policy, we need to add it
+										if (!firewall_is_app_in_profile(imageFileName, fwProfile)) {
+											firewall_app_add(name, imageFileName, fwProfile);
+											// App exists in the policy, we just need to enable it
+										}
+										else {
+											firewall_app_toggle(imageFileName, fwProfile, true);
+										}
 									}
+									// 
+									// Unwind and clean up
+									//
+									fwProfile->Release();
 								}
-								// 
-								// Unwind and clean up
-								//
-								fwProfile->Release();
+								fwPolicy->Release();
 							}
-							fwPolicy->Release();
-						} 
-						fwMgr->Release();
+							fwMgr->Release();
+						}
 					}
 
 					// After unravelling, if we errored, throw our exception
 					if (hr != S_OK) {
-						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+						_com_error err(hr);	
+					
+						throw EXCEPT_TEXT(jio::exception, hr, xplatform::wstring_to_string(err.ErrorMessage()).c_str());
 					}
 
 					return true;

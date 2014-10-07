@@ -121,6 +121,12 @@ namespace jio {
 			return message;
 		}
 
+		static std::string wstring_to_string(const std::wstring & in) {
+			std::string ret;
+			ret.assign(in.begin(), in.end());
+			return ret;
+		}
+
 		//
 		// Helper functions
 		//
