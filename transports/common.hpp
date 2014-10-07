@@ -15,9 +15,14 @@ namespace jio {
 		*/
 		template<typename T> class message_t {
 		public:
-			message_t(const T _data, const uint32_t _length, i_transport *transport) { data = _data; length = _length; src = transport; }
-			message_t(const T _data, const uint32_t _length) { data = _data; length = _length; src = NULL; }
-			message_t(const message_t& o) { data = o.data; length = o.length; src = o.src; }
+			message_t(T *_data, const uint32_t _length) {
+				data = new T[_length];  memcpy(data, _data, _length * sizeof(T));
+				length = _length; src = NULL; }
+			message_t(T *_data, const uint32_t _length, i_transport *transport) {
+				data = new T[_length];  memcpy(data, _data, _length * sizeof(T));
+				length = _length; src = transport; }
+			
+			message_t(const message_t & o) { data = o.data; length = o.length; src = o.src; }
 			void operator = (const message_t & o) { data = o.data; length = o.length; src = o.src; }
 			~message_t() {
 				// This should ONLY be access via a shared pointer
@@ -28,12 +33,12 @@ namespace jio {
 			//void operator = (const message_t<T> & o) { data = o.data; length = o.length; }
 			
 			
-			T data;
+			T *data;
 			i_transport * src;
 			uint32_t length;
 		};
-		typedef message_t<unsigned char *> message;
-		typedef std::shared_ptr< message_t<unsigned char *> > message_p;
+		typedef message_t<unsigned char> message;
+		typedef std::shared_ptr< message_t<unsigned char> > message_p;
 		/*
 		*	Transport Interface
 		*/
@@ -44,8 +49,8 @@ namespace jio {
 			
 			virtual void 			flush(void) = 0;
 			
-			virtual message_p 		read(void) = 0;
-			virtual uint32_t		write(const message_p data) = 0;
+			virtual message  * read(void) = 0;
+			virtual uint32_t write(const message & data) = 0;
 
 		};
 		

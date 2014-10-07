@@ -78,7 +78,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\tests\dispatcher.cpp" />
     <ClCompile Include="..\test\basic_udp.cpp" />
     <ClCompile Include="..\test\named_pipe.cpp" />
     <ClCompile Include="..\test\test.cpp" />

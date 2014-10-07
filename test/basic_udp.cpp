@@ -10,8 +10,8 @@ void basic_udp(void) {
 		printf("* Press enter to stop listening\n");
 		while (true) {
 			try {
-				jio::transports::message_p msg = server.read();
-				if (msg.get() != nullptr) {
+				jio::transports::message  * msg = server.read();
+				if (msg != nullptr) {
 					printf("%d:%s", msg->length, msg->data);
 					break;
 				}

@@ -57,7 +57,7 @@ namespace jio {
 				THROW_NOT_IMPL();
 			}
 
-			message_p read(void) {
+			message * read(void) {
 				uint32_t res;
 				unsigned char *data;
 
@@ -68,10 +68,10 @@ namespace jio {
 					throw EXCEPT_TEXT(jio::exception, WSAGetLastError(), "recv() error");
 				}
 
-				return std::shared_ptr<message>(nullptr);
+				return nullptr;
 			}
 
-			uint32_t write(const message_p data) {
+			uint32_t write(const message & data) {
 				uint32_t res, sCount;
 
 				if (dest_address == INADDR_NONE) {
@@ -81,8 +81,8 @@ namespace jio {
 					throw EXCEPT_TEXT(jio::exception, -1, "Transport not active.");
 				}
 				// loop sending the data until we send all of it
-				for (sCount = 0; sCount < data->length;) {
-					res = ::send(socket_fd, (const char *)(data->data + sCount), (data->length - sCount), 0);
+				for (sCount = 0; sCount < data.length;) {
+					res = ::send(socket_fd, (const char *)(data.data + sCount), (data.length - sCount), 0);
 					
 					if (res == -1) {
 						throw EXCEPT_TEXT(jio::exception, -1, "send() failed");
@@ -90,7 +90,7 @@ namespace jio {
 					sCount += res;
 				}
 
-				return data->length;
+				return data.length;
 			}
 		protected:
 			sockaddr_in listen_addr;

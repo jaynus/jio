@@ -133,31 +133,37 @@ namespace jio {
 			/*!
 			*	Reads the next full message off the named pipe buffer
 			*/
-			message_p  read(void) {
+			message *  read(void) {
 				// Read a message off the buffer
 				BOOL fSuccess = FALSE;
-				DWORD cbRead = -1;
+				DWORD cbRead = 0;
+				DWORD cbTotalRead = 0;
 
 				fSuccess = ReadFile(_hPipe, _inputBuffer, _settings.max_buffer_in, &cbRead, NULL);
-				if (!fSuccess) {
+				if (!fSuccess && GetLastError() != ERROR_MORE_DATA) {
 					return nullptr;
+				} else if (GetLastError() == ERROR_MORE_DATA) {
+					while (GetLastError() == ERROR_MORE_DATA) {
+						cbTotalRead += cbRead;
+						fSuccess = ReadFile(_hPipe, _inputBuffer + cbTotalRead, _settings.max_buffer_in - cbTotalRead, &cbRead, NULL);
+					}
 				}
-
-				return std::shared_ptr<message_t <unsigned char *>>(new message(_inputBuffer, cbRead));
+				
+				return new message(_inputBuffer, cbTotalRead, this);
 			}
 			/*!
 			*	Writes the next message to the named pipe buffer.
 			*/
-			uint32_t write(const message_p data) {
+			uint32_t write(const message & data) {
 				BOOL fSuccess = FALSE;
 				DWORD cbWritten = 0;
 
 				// write the full packet
-				while (cbWritten < data->length) {
+				while (cbWritten < data.length) {
 					fSuccess = WriteFile(
 						_hPipe,                  // pipe handle 
-						data->data,             // message 
-						data->length,              // message length 
+						data.data,             // message 
+						data.length,              // message length 
 						&cbWritten,             // bytes written 
 						NULL);                  // not overlapped 
 					if (!fSuccess) {

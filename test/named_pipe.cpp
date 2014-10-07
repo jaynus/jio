@@ -20,10 +20,12 @@ void client_test() {
 	
 	client_pipe = new jio::transports::named_pipe(TEST_NAME, jio::transports::named_pipe_settings());
 	while (true) {
-		unsigned char data[] = "AAAA";
-		jio::transports::message * msg = new jio::transports::message(data, 4);
-		client_pipe->write(std::shared_ptr<jio::transports::message_t <unsigned char *>>(msg));
-		sent = true;
+		if (!sent) {
+			unsigned char data[] = "AAAA";
+			jio::transports::message msg(data, 4, NULL);
+			client_pipe->write(msg);
+			sent = true;
+		}
 		sleep(1);
 	}
 }
@@ -31,7 +33,7 @@ void client_test() {
 void server_test() {
 	printf("* Server Entry\n");
 	while (true) {
-		jio::transports::message_p ptr = server_pipe->read();
+		jio::transports::message * ptr = server_pipe->read();
 		if (ptr != nullptr) {
 			printf("Got a real message!\n");
 		}
