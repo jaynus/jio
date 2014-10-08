@@ -13,7 +13,7 @@
 
 namespace jio {
 	namespace transports {
-		
+		using namespace jio::messaging;
 		typedef struct named_pipe_settings {
 			int asdf;
 		} named_pipe_settings;

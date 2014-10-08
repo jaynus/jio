@@ -7,6 +7,7 @@
 
 namespace jio {
 	namespace transports {	 
+		using namespace jio::messaging;
 		/*! 
 		 * Base class for pipe-based transport implementations (such as named pipes, FIFO, loopback, etc)
 		 */

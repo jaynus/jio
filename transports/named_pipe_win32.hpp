@@ -10,6 +10,7 @@
 #include <jio/exception.hpp>
 #include <jio/transports/common.hpp>
 
+
 #include <thread>
 #include <string>
 
@@ -17,7 +18,7 @@
 
 namespace jio {
 	namespace transports {
-
+		using namespace jio::messaging;
 		/*!
 		*	Defines settings for a win32 named pipe instance.
 		*/

@@ -8,6 +8,7 @@
 
 namespace jio {
 	namespace transports {
+		using namespace jio::messaging;
 		/*
 		* UDP Interface
 		*	Because UDP doesn't have a true server/client infastructure, each stream actually just has a destination host and a receiving port.
