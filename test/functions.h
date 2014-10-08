@@ -13,3 +13,4 @@
 void named_pipe(void);
 void basic_udp(void);
 void dispatcher(void);
+void protobuf(void);

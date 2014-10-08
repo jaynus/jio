@@ -18,6 +18,9 @@
 namespace jio {
 	namespace transports {
 
+		/*!
+		*	Defines settings for a win32 named pipe instance.
+		*/
 		typedef struct named_pipe_settings {
 			uint32_t timeout;
 			uint32_t max_buffer_in;
@@ -40,14 +43,19 @@ namespace jio {
 			}
 		} named_pipe_settings;
 		
-
+		/*!
+		*	implementation of base_pipe and i_transport for a win32 named pipe.
+		*	This object is NOT thread safe.
+		*/
 		class named_pipe :
 			public base_pipe {
 		public:
 			/*!
 			*	Initialize named pipe implementation on the pipe of pipename. This will create the pipe and begin listening if its the server.
+			*	This function is NOT thread safe.
 			*
 			* 	@param [in] pipename The fully qualified path of the named pipe to call.
+			* 	@param [in] settings Settings to define this named pipe server handle instance, if applicable.
 			*	@param [in] is_server Boolean on whether this is a client or server instance of the class.
 			**/
 
@@ -73,7 +81,8 @@ namespace jio {
 			}
 
 			/*!
-			*	Destructor for our named pipe win32 implementation. This function will perform the appropriate disconnections and cleanup
+			*	Destructor for our named pipe win32 implementation. This function will perform the appropriate disconnections and cleanup.
+			*	This function is NOT thread safe.
 			*/
 			~named_pipe() {
 				close();
@@ -81,6 +90,10 @@ namespace jio {
 				delete _outputBuffer;
 			}
 
+			/*!
+			*	Opens the current named pipe channel if this object instance was defined as a client. If it was a server, we just return true.
+			*	This function is NOT thread safe.
+			*/
 			bool open(void) { 
 				
 				// Bail out if we are the server and just pretend we are always open
@@ -110,11 +123,18 @@ namespace jio {
 						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
 					}
 				}
+
+				return true;
 			}
+
+			/*!
+			*	Closes the current named pipe instance. This includes closing all server handles. 
+			*	This object is not reusable if a server.
+			*	This function is NOT thread safe.
+			*/
 			void close(void) {
-				
-				if (_hPipe != INVALID_HANDLE_VALUE) {
 					if (is_server()) {
+				if (_hPipe != INVALID_HANDLE_VALUE) {
 						DisconnectNamedPipe(_hPipe);
 						if (_settings.use_completion_port) {
 							CloseHandle(_hCompletionPort);
@@ -129,7 +149,10 @@ namespace jio {
 			}
 
 			/*!
-			*	Reads the next full message off the named pipe buffer
+			*	Reads the next full message off the named pipe buffer.
+			*	This implementation of the read function returns a new allocated instance of a message object. 
+			*	This makes for large amounts of heap memory allocations.
+			*	This function is NOT thread safe.
 			*/
 			message *  read(void) {
 				// Read a message off the buffer
@@ -151,7 +174,71 @@ namespace jio {
 				return new message(_inputBuffer, cbTotalRead, this);
 			}
 			/*!
+			*	Reads the next full message off the named pipe buffer.
+			*	This implementation of the read function returns the read message, as allocated by the allocation factory.
+			*	This function is NOT thread safe.
+			*
+			*	@param [in] factory The allocation factory to read the new message into.
+			*/
+			message *  read(i_message_factory *factory) {
+				// Read a message off the buffer
+				BOOL fSuccess = FALSE;
+				DWORD cbRead = 0;
+				DWORD cbTotalRead = 0;
+
+				fSuccess = ReadFile(_hPipe, _inputBuffer, _settings.max_buffer_in, &cbRead, NULL);
+				cbTotalRead += cbRead;
+				if (!fSuccess && GetLastError() != ERROR_MORE_DATA) {
+					return nullptr;
+				}
+				else if (GetLastError() == ERROR_MORE_DATA) {
+					while (GetLastError() == ERROR_MORE_DATA) {
+						cbTotalRead += cbRead;
+						fSuccess = ReadFile(_hPipe, _inputBuffer + cbTotalRead, _settings.max_buffer_in - cbTotalRead, &cbRead, NULL);
+					}
+				}
+
+				return factory->createMessage(_inputBuffer, cbTotalRead, this);
+			}
+			/*!
+			*	Reads the next full message off the named pipe buffer.
+			*	This implementation of the read function copies the data into the pre-allocated message. 
+			*	It assumes proper data and lengths for the message. Truncates message if not enough space.
+			*	This function is NOT thread safe.
+			*
+			*	@param [in] factory The allocation factory to read the new message into.
+			*/
+			message *  read(message & msg) {
+				// Read a message off the buffer
+				BOOL fSuccess = FALSE;
+				DWORD cbRead = 0;
+				DWORD cbTotalRead = 0;
+				DWORD maxRead = 0;
+
+				if (msg.length < 1 || msg.data == nullptr)
+					throw EXCEPT_TEXT(jio::exception, E_INVALIDARG, std::string("Invalid message object provided."));
+				
+				maxRead = min(_settings.max_buffer_in, msg.length);
+				fSuccess = ReadFile(_hPipe, _inputBuffer, maxRead, &cbRead, NULL);
+				cbTotalRead += cbRead;
+				if (!fSuccess && GetLastError() != ERROR_MORE_DATA) {
+					return nullptr;
+				}
+				else if (GetLastError() == ERROR_MORE_DATA) {
+					while (GetLastError() == ERROR_MORE_DATA && cbTotalRead < msg.length) {
+						cbTotalRead += cbRead;
+						fSuccess = ReadFile(_hPipe, _inputBuffer + cbTotalRead, maxRead - cbTotalRead, &cbRead, NULL);
+					}
+				}
+
+				return &msg;
+			}
+
+			/*!
 			*	Writes the next message to the named pipe buffer.
+			*	This function is NOT thread safe.
+			*
+			*	@param [in] data the message object to send the data from. 
 			*/
 			uint32_t write(const message & data) {
 				BOOL fSuccess = FALSE;
@@ -176,6 +263,7 @@ namespace jio {
 
 			/*!
 			*	Flush the pipe where applicable.
+			*	This function is NOT thread safe.
 			*/
 			void flush(void) {
 				FlushFileBuffers(_hPipe);

@@ -10,8 +10,9 @@
 namespace jio {
 	namespace transports {
 		class i_transport;
-		/*
-		* Generic data class
+		
+		/*! 
+		*	Generic message data class
 		*/
 		template<typename T> class message_t {
 		public:
@@ -38,8 +39,17 @@ namespace jio {
 		};
 		typedef message_t<unsigned char> message;
 		typedef std::shared_ptr< message_t<unsigned char> > message_p;
-		/*
-		*	Transport Interface
+
+		/*!
+		*	Interface for message allocation factory. Use this if you want to use different buffers for messages
+		*/
+		class i_message_factory {
+		public:
+			virtual message		*createMessage(unsigned char *, size_t, i_transport *) = 0;
+		};
+
+		/*!
+		*	Interface for a transport
 		*/
 		class i_transport {
 		public:
@@ -53,8 +63,8 @@ namespace jio {
 
 		};
 		
-		/*
-		* 	Base Transport Class
+		/*!
+		*	Base class implementation of blank transport interface
 		*/
 		class base_transport : 
 			public i_transport {
