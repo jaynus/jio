@@ -138,6 +138,7 @@ namespace jio {
 				DWORD cbTotalRead = 0;
 
 				fSuccess = ReadFile(_hPipe, _inputBuffer, _settings.max_buffer_in, &cbRead, NULL);
+				cbTotalRead += cbRead;
 				if (!fSuccess && GetLastError() != ERROR_MORE_DATA) {
 					return nullptr;
 				} else if (GetLastError() == ERROR_MORE_DATA) {
@@ -154,20 +155,23 @@ namespace jio {
 			*/
 			uint32_t write(const message & data) {
 				BOOL fSuccess = FALSE;
-				DWORD cbWritten = 0;
+				DWORD cbWritten = 0, rcbWritten = 0;
 
 				// write the full packet
 				while (cbWritten < data.length) {
 					fSuccess = WriteFile(
 						_hPipe,                  // pipe handle 
-						data.data,             // message 
-						data.length,              // message length 
-						&cbWritten,             // bytes written 
+						data.data+cbWritten,             // message 
+						data.length-cbWritten,              // message length 
+						&rcbWritten,             // bytes written 
 						NULL);                  // not overlapped 
+					cbWritten += rcbWritten;
 					if (!fSuccess) {
 						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
 					}
 				}
+
+				return cbWritten;
 			}
 
 			/*!

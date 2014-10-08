@@ -96,16 +96,15 @@ namespace jio {
 				} else {
 					if (disp->settings.isolate) {
 						if (disp->settings.async) {
-							std::thread t(func(this, disp));
+							//std::thread t(func(this, disp));
 						} else {
-							std::thread t(func(this, disp));
-							t.join();
+							//std::thread t(func(this, disp));
+							//t.join();
 						}
 					}
 				}
-				if (disp->settings.callback != nullptr && !disp->settings.async && !disp->settings.isolate) {
-					disp->settings.callback(this, ret);
-				}
+
+				return ret;
 			}
 			
 			bool _isolated;

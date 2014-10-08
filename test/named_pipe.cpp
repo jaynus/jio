@@ -21,8 +21,8 @@ void client_test() {
 	client_pipe = new jio::transports::named_pipe(TEST_NAME, jio::transports::named_pipe_settings());
 	while (true) {
 		if (!sent) {
-			unsigned char data[] = "AAAA";
-			jio::transports::message msg(data, 4, NULL);
+			unsigned char data[] = "AAAA\x00";
+			jio::transports::message msg(data, 5, NULL);
 			client_pipe->write(msg);
 			sent = true;
 		}
@@ -36,6 +36,7 @@ void server_test() {
 		jio::transports::message * ptr = server_pipe->read();
 		if (ptr != nullptr) {
 			printf("Got a real message!\n");
+			printf("[%s]", ptr->data);
 		}
 		sleep(1);
 	}
