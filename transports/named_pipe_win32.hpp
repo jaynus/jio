@@ -19,6 +19,7 @@
 namespace jio {
 	namespace transports {
 		using namespace jio::messaging;
+
 		/*!
 		*	Defines settings for a win32 named pipe instance.
 		*/
@@ -51,6 +52,7 @@ namespace jio {
 		class named_pipe :
 			public base_pipe {
 		public:
+
 			/*!
 			*	Initialize named pipe implementation on the pipe of pipename. This will create the pipe and begin listening if its the server.
 			*	This function is NOT thread safe.
@@ -59,7 +61,6 @@ namespace jio {
 			* 	@param [in] settings Settings to define this named pipe server handle instance, if applicable.
 			*	@param [in] is_server Boolean on whether this is a client or server instance of the class.
 			**/
-
 			named_pipe(const std::string & pipename, named_pipe_settings settings, bool is_server = false) {
 				_name = pipename;
 				_server = is_server;
@@ -101,8 +102,8 @@ namespace jio {
 				if (_server) {
 					return true;
 				}
-				// Client functionality
 
+				// Client functionality
 				// Connect to the pipe
 				_hPipe = CreateFileA(
 					_name.c_str(),			// pipe name 
@@ -174,6 +175,7 @@ namespace jio {
 				
 				return new message(_inputBuffer, cbTotalRead, this);
 			}
+
 			/*!
 			*	Reads the next full message off the named pipe buffer.
 			*	This implementation of the read function returns the read message, as allocated by the allocation factory.
@@ -201,6 +203,7 @@ namespace jio {
 
 				return factory->createMessage(_inputBuffer, cbTotalRead, this);
 			}
+
 			/*!
 			*	Reads the next full message off the named pipe buffer.
 			*	This implementation of the read function copies the data into the pre-allocated message. 
@@ -342,7 +345,13 @@ namespace jio {
 			*/
 			class security {
 			public:
-				// wrapper to provide module name
+				/*!
+				*	This function is a wrapper for its overload which performs all logic to add a firewall rule for
+				*	a given image file name. This wrapper provides the currently running executables image for the 
+				*	firewall exception.
+				*
+				*	@param [in] name The firewall rule name you want created for the currently running application.
+				*/
 				static bool set_firewall_allow(const std::wstring &name) {
 					// We need to pull our image name for the helper function to get it
 					WCHAR filePathName[MAX_PATH];
@@ -352,6 +361,13 @@ namespace jio {
 					return security::set_firewall_allow(L"ACRE 2 Plugin", modulename);
 				}
 
+				/*!
+				*	Performs all the actual logic for adding a provided image file to a firewall exception rule. 
+				*	Utilizes the COM API for adding itself as an exception. This does not require administrator to run.
+				*
+				*	@param [in] name The firewall rule name you want created for the currently running application.
+				*	@param [in] imageFileName The binary image to create the firewall exception for.
+				*/
 				static bool set_firewall_allow(const std::wstring & name, const std::wstring & imageFileName) {
 					INetFwProfile*		fwProfile;
 					INetFwMgr*			fwMgr;
@@ -416,10 +432,27 @@ namespace jio {
 					return true;
 				}
 
-				static PSECURITY_DESCRIPTOR get_untrusted_sa(void) {
-	//				SECURITY_ATTRIBUTES sa;
+				/*!
+				*	Generates a low integrity integrity DACL.
+				*/
+				static PSECURITY_DESCRIPTOR get_low_sa(void) {
 					PSECURITY_DESCRIPTOR pSD;
-					
+
+					pSD = NULL;
+					if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(LOW_INTEGRITY_SDDL_SACL_W, SDDL_REVISION_1, &pSD, NULL)) {
+						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
+					}
+
+					return pSD;
+				}
+
+				/*!
+				*	Generates a untrusted integrity DACL.
+				*	NOTE: THIS IS THE MAGIC DACL FOR ALLOWING ANYTHING TO CONNECT TO OUR PIPE.
+				*/
+				static PSECURITY_DESCRIPTOR get_untrusted_sa(void) {
+					PSECURITY_DESCRIPTOR pSD;
+
 					pSD = NULL;
 					if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(UNTRUSTED_INTEGRITY_SDDL_SACL_W, SDDL_REVISION_1, &pSD, NULL)) {
 						throw EXCEPT_TEXT(jio::exception, GetLastError(), jio::xplatform::GetLastErrorAsString());
@@ -428,7 +461,90 @@ namespace jio {
 					return pSD;
 				}
 
+				/*!
+				*	Gets a SID for the current LOGON. Can be used for pipe security.
+				*/
+				BOOL GetLogonSID(HANDLE hToken, PSID *ppsid)
+				{
+					BOOL bSuccess = FALSE;
+					DWORD dwIndex;
+					DWORD dwLength = 0;
+					PTOKEN_GROUPS ptg = NULL;
+
+					// Verify the parameter passed in is not NULL.
+					if (NULL == ppsid)
+						goto Cleanup;
+
+					// Get required buffer size and allocate the TOKEN_GROUPS buffer.
+
+					if (!GetTokenInformation(
+						hToken,         // handle to the access token
+						TokenGroups,    // get information about the token's groups 
+						(LPVOID)ptg,   // pointer to TOKEN_GROUPS buffer
+						0,              // size of buffer
+						&dwLength       // receives required buffer size
+						))
+					{
+						if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+							goto Cleanup;
+
+						ptg = (PTOKEN_GROUPS)HeapAlloc(GetProcessHeap(),
+							HEAP_ZERO_MEMORY, dwLength);
+
+						if (ptg == NULL)
+							goto Cleanup;
+					}
+
+					// Get the token group information from the access token.
+
+					if (!GetTokenInformation(
+						hToken,         // handle to the access token
+						TokenGroups,    // get information about the token's groups 
+						(LPVOID)ptg,   // pointer to TOKEN_GROUPS buffer
+						dwLength,       // size of buffer
+						&dwLength       // receives required buffer size
+						))
+					{
+						goto Cleanup;
+					}
+
+					// Loop through the groups to find the logon SID.
+
+					for (dwIndex = 0; dwIndex < ptg->GroupCount; dwIndex++)
+						if ((ptg->Groups[dwIndex].Attributes & SE_GROUP_LOGON_ID)
+							== SE_GROUP_LOGON_ID)
+						{
+							// Found the logon SID; make a copy of it.
+
+							dwLength = GetLengthSid(ptg->Groups[dwIndex].Sid);
+							*ppsid = (PSID)HeapAlloc(GetProcessHeap(),
+								HEAP_ZERO_MEMORY, dwLength);
+							if (*ppsid == NULL)
+								goto Cleanup;
+							if (!CopySid(dwLength, *ppsid, ptg->Groups[dwIndex].Sid))
+							{
+								HeapFree(GetProcessHeap(), 0, (LPVOID)*ppsid);
+								goto Cleanup;
+							}
+							break;
+						}
+
+					bSuccess = TRUE;
+
+				Cleanup:
+
+					// Free the buffer for the token groups.
+
+					if (ptg != NULL)
+						HeapFree(GetProcessHeap(), 0, (LPVOID)ptg);
+
+					return bSuccess;
+				}
+
 			protected:
+				/*!
+				*	Internal function to add an application to the provided firewall policy object.
+				*/
 				static bool firewall_app_add(const std::wstring & name, const std::wstring & imageFileName, INetFwProfile* fwProfile) {
 					INetFwAuthorizedApplication*	fwApp = NULL;
 					INetFwAuthorizedApplications*	fwApps = NULL;
@@ -481,6 +597,11 @@ namespace jio {
 
 					return result;
 				}
+
+				/*!
+				*	Internal function to check whether a firewall rule, in a firewall profile, is already enabled for 
+				*	the provided image file.
+				*/
 				static bool firewall_is_app_enabled(const std::wstring & imageFileName, INetFwProfile* fwProfile) {
 					INetFwAuthorizedApplication*	fwApp = NULL;
 					INetFwAuthorizedApplications*	fwApps = NULL;
@@ -515,6 +636,9 @@ namespace jio {
 					return result;
 				}
 
+				/*!
+				*	Checks whether an application (image file) is already in a provided application firewall profile.
+				*/
 				static bool firewall_is_app_in_profile(const std::wstring & imageFileName, INetFwProfile* fwProfile) {
 					INetFwAuthorizedApplication*	fwApp = NULL;
 					INetFwAuthorizedApplications*	fwApps = NULL;
@@ -543,6 +667,9 @@ namespace jio {
 					return result;
 				}
 
+				/*!
+				*	Toggles an application firewall exception within the provided firewall profile.
+				*/
 				static bool firewall_app_toggle(const std::wstring & imageFileName, INetFwProfile* fwProfile, bool enabled) {
 					INetFwAuthorizedApplication*	fwApp = NULL;
 					INetFwAuthorizedApplications*	fwApps = NULL;
