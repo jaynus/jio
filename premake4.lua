@@ -32,10 +32,8 @@ solution("CryGame")
 		includedirs("external/protobuf-2.6.0/src")
 		includedirs("test")
 		
+
 		files("**.hpp")
-		files("**.hpp")
-		files("**.hpp")
-		
 
 		configuration("Debug")
 			flags("Symbols")
