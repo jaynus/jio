@@ -1,0 +1,6 @@
+{ "tools": { 
+		"protoc" : "tools/protoc.exe",
+		"premake4" : "tools/premake4.exe",
+		"vs2014_bin" : "C:\\Applications\\Microsoft Visual Studio 14.0\\VC\\bin"
+	} 
+}
