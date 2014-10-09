@@ -13,6 +13,7 @@
 
 #include <thread>
 #include <string>
+#include <iostream>
 
 #include "comdef.h"
 
@@ -52,6 +53,48 @@ namespace jio {
 		class named_pipe :
 			public base_pipe {
 		public:
+			//
+			// stream operators
+			//
+			friend std::ostream &operator<<(std::ostream &output, const named_pipe & me) { THROW_NOT_IMPL(); }
+			friend std::istream &operator>>(std::istream  &input, named_pipe & me ) { THROW_NOT_IMPL(); }
+
+			//
+			// Working stream operators for messages
+			/*!
+			 * Write operator for message object type.
+			 */
+			friend std::istream &operator>>(const message &msg, named_pipe & me) { 
+				me.write(msg); 
+			}
+			/*!
+			* Read operator for message object type.
+			*/
+			friend std::istream &operator<<(message & msg, named_pipe & me) { 
+				me.read(msg); 
+			}
+			/*!
+			* Write operator for a string.
+			*/
+			friend std::istream &operator>>(const std::string &str, named_pipe & me) { 
+				message msg((unsigned char *)str.c_str(), str.size() + 1, (i_transport *)&me);
+				me.write(msg);
+			}
+			/*!
+			* Read operator for a string.
+			*/
+			friend std::istream &operator<<(std::string &str, named_pipe & me) { 
+				message *read = me.read();
+
+				str = "";
+				if (read != nullptr && read->length > 1) {
+					read->data[read->length-1] = 0x00;
+					str.append((char *)read->data);
+				}
+
+				delete read;
+			}
+
 
 			/*!
 			*	Initialize named pipe implementation on the pipe of pipename. This will create the pipe and begin listening if its the server.
@@ -483,8 +526,7 @@ namespace jio {
 						(LPVOID)ptg,   // pointer to TOKEN_GROUPS buffer
 						0,              // size of buffer
 						&dwLength       // receives required buffer size
-						))
-					{
+						)) {
 						if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
 							goto Cleanup;
 
@@ -509,11 +551,9 @@ namespace jio {
 					}
 
 					// Loop through the groups to find the logon SID.
-
 					for (dwIndex = 0; dwIndex < ptg->GroupCount; dwIndex++)
 						if ((ptg->Groups[dwIndex].Attributes & SE_GROUP_LOGON_ID)
-							== SE_GROUP_LOGON_ID)
-						{
+							== SE_GROUP_LOGON_ID) {
 							// Found the logon SID; make a copy of it.
 
 							dwLength = GetLengthSid(ptg->Groups[dwIndex].Sid);
@@ -521,8 +561,7 @@ namespace jio {
 								HEAP_ZERO_MEMORY, dwLength);
 							if (*ppsid == NULL)
 								goto Cleanup;
-							if (!CopySid(dwLength, *ppsid, ptg->Groups[dwIndex].Sid))
-							{
+							if (!CopySid(dwLength, *ppsid, ptg->Groups[dwIndex].Sid)) {
 								HeapFree(GetProcessHeap(), 0, (LPVOID)*ppsid);
 								goto Cleanup;
 							}
@@ -532,9 +571,7 @@ namespace jio {
 					bSuccess = TRUE;
 
 				Cleanup:
-
 					// Free the buffer for the token groups.
-
 					if (ptg != NULL)
 						HeapFree(GetProcessHeap(), 0, (LPVOID)ptg);
 
