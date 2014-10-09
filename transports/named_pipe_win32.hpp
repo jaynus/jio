@@ -53,49 +53,6 @@ namespace jio {
 		class named_pipe :
 			public base_pipe {
 		public:
-			//
-			// stream operators
-			//
-			friend std::ostream &operator<<(std::ostream &output, const named_pipe & me) { THROW_NOT_IMPL(); }
-			friend std::istream &operator>>(std::istream  &input, named_pipe & me ) { THROW_NOT_IMPL(); }
-
-			//
-			// Working stream operators for messages
-			/*!
-			 * Write operator for message object type.
-			 */
-			friend std::istream &operator>>(const message &msg, named_pipe & me) { 
-				me.write(msg); 
-			}
-			/*!
-			* Read operator for message object type.
-			*/
-			friend std::istream &operator<<(message & msg, named_pipe & me) { 
-				me.read(msg); 
-			}
-			/*!
-			* Write operator for a string.
-			*/
-			friend std::istream &operator>>(const std::string &str, named_pipe & me) { 
-				message msg((unsigned char *)str.c_str(), str.size() + 1, (i_transport *)&me);
-				me.write(msg);
-			}
-			/*!
-			* Read operator for a string.
-			*/
-			friend std::istream &operator<<(std::string &str, named_pipe & me) { 
-				message *read = me.read();
-
-				str = "";
-				if (read != nullptr && read->length > 1) {
-					read->data[read->length-1] = 0x00;
-					str.append((char *)read->data);
-				}
-
-				delete read;
-			}
-
-
 			/*!
 			*	Initialize named pipe implementation on the pipe of pipename. This will create the pipe and begin listening if its the server.
 			*	This function is NOT thread safe.
@@ -315,12 +272,49 @@ namespace jio {
 			void flush(void) {
 				FlushFileBuffers(_hPipe);
 			}
-		
+
 			/*!
 			*	Returns the settings used to create this pipe.
 			*/
 			const named_pipe_settings & named_pipe_settings() const { return _settings; }
-		
+
+
+//
+// Stream operators
+//
+
+			/*!
+			* Write operator for jio::messaging::message
+			*/
+			named_pipe & operator<<(const message &msg) {
+				this->write(msg);
+
+				return *this;
+			}
+			/*!
+			* Read operator for jio::messaging::message
+			*/
+			friend message & operator<<(message & msg, named_pipe & me) {
+				THROW_NOT_IMPL();
+
+				return msg;
+			}
+			/*!
+			* Write operator for std::string
+			*/
+			named_pipe & operator<<(const std::string &str) {
+				this->write(message((unsigned char *)str.c_str(), str.size() + 1, this));
+
+				return *this;
+			}
+			/*!
+			* Read operator for std::string
+			*/
+			friend std::string & operator<<(std::string & str, named_pipe & me) {
+				THROW_NOT_IMPL();
+
+				return str;
+			}
 
 		protected:
 			// Internal win32-specific properties are here.

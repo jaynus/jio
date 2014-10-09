@@ -6,7 +6,7 @@
 
 const char *TEST_NAME = "\\\\.\\pipe\\die";
 jio::transports::named_pipe *server_pipe;
-jio::transports::named_pipe *client_pipe;
+
 
 class NewPlayerMessage {
 public:
@@ -17,13 +17,14 @@ void client_test() {
 	bool sent = false;
 
 	printf("* Client Entry\n");
-	
-	client_pipe = new jio::transports::named_pipe(TEST_NAME, jio::transports::named_pipe_settings());
+	jio::transports::named_pipe client_pipe(TEST_NAME, jio::transports::named_pipe_settings());
 	while (true) {
 		if (!sent) {
 			unsigned char data[] = "AAAA\x00";
 			jio::transports::message msg(data, 5, NULL);
-			client_pipe->write(msg);
+			client_pipe.write(msg);
+			client_pipe << msg; 
+			client_pipe << std::string("Fuck you");
 			sent = true;
 		}
 		sleep(1);
@@ -35,8 +36,8 @@ void server_test() {
 	while (true) {
 		jio::transports::message * ptr = server_pipe->read();
 		if (ptr != nullptr) {
-			printf("Got a real message!\n");
-			printf("[%s]", ptr->data);
+			printf("Rcpt:[%s]\n", ptr->data);
+			delete ptr;
 		}
 		sleep(1);
 	}

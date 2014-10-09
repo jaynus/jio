@@ -32,6 +32,21 @@ namespace jio {
 			//message_t(const message_t<T> & o ) {  data = o.data; length = o.length; } 
 			//void operator = (const message_t<T> & o) { data = o.data; length = o.length; }
 
+			std::string to_string() {
+				std::string ret = "";
+
+				if (length > 0) {
+					if (this->data[length - 1] != 0x00) {
+						T buffer[this->length];
+						buffer[length - 1] = 0x00;
+						ret = buffer;
+					} else {
+						ret = (char *)this->data;
+					}
+				}
+
+				return ret;
+			}
 
 			T *data;
 			i_transport * src;
