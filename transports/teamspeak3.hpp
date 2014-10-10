@@ -20,7 +20,10 @@ namespace jio {
 		class teamspeak3 : public base_transport {
 		public:
 			teamspeak3() { }
-			~teamspeak3(){}
+			~teamspeak3() { 
+				// clear the internal queue on destruction
+				flush();
+			}
 	
 			/*!
 			 * TS3 function hook for receiving messages. This will queue messages for later reading as they are received.
