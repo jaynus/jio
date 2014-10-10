@@ -71,6 +71,8 @@ namespace jio {
 
 				return nullptr;
 			}
+			message *  read(i_message_factory *factory) { THROW_NOT_IMPL(); return nullptr; }
+			message *  read(message & msg) { THROW_NOT_IMPL(); return nullptr; }
 
 			uint32_t write(const message & data) {
 				uint32_t res, sCount;

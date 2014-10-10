@@ -20,6 +20,8 @@ namespace jio {
 			
 			virtual void 			flush(void) = 0;
 			
+			virtual jio::messaging::message *  read(i_message_factory *factory) = 0;
+			virtual jio::messaging::message *  read(message & msg) = 0;
 			virtual jio::messaging::message  * read(void) = 0;
 			virtual uint32_t write(const jio::messaging::message & data) = 0;
 
