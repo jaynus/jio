@@ -9,6 +9,8 @@
 
 namespace jio {
 	namespace transports {
+		using namespace jio::messaging;
+
 		class i_transport;
 		/*!
 		*	Interface for a transport
